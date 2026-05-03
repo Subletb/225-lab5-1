@@ -3,10 +3,9 @@ pipeline {
 
     environment {
         DOCKER_CREDENTIALS_ID = 'roseaw-dockerhub'
-        DOCKER_IMAGE = 'cithit/subletb-lab5'   // ✅ FIXED IMAGE NAME
+        DOCKER_IMAGE = 'cithit/subletb-lab5'
         IMAGE_TAG = "build-${BUILD_NUMBER}"
         GITHUB_URL = 'https://github.com/Subletb/225-lab5-1.git'
-        KUBECONFIG = credentials('subletb-225') // Jenkins stored kubeconfig
     }
 
     stages {
@@ -23,7 +22,6 @@ pipeline {
 
         stage('Static Code Testing') {
             steps {
-                // Use compatible version for Jenkins node
                 sh 'npm install htmlhint@1.8.0 --save-dev'
                 sh 'npx htmlhint index.html'
             }
@@ -49,12 +47,9 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                script {
-                
-                    writeFile file: 'kubeconfig', text: KUBECONFIG
-
+                withCredentials([file(credentialsId: 'subletb-225', variable: 'KUBECONFIG_FILE')]) {
                     sh """
-                    export KUBECONFIG=\$PWD/kubeconfig
+                    export KUBECONFIG=$KUBECONFIG_FILE
                     sed -i 's|image: .*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|' deployment-dev.yaml
                     kubectl apply -f deployment-dev.yaml
                     """
@@ -64,12 +59,14 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                sh """
-                export KUBECONFIG=\$PWD/kubeconfig
-                kubectl get pods
-                kubectl get services
-                kubectl get deployments
-                """
+                withCredentials([file(credentialsId: 'subletb-225', variable: 'KUBECONFIG_FILE')]) {
+                    sh """
+                    export KUBECONFIG=$KUBECONFIG_FILE
+                    kubectl get pods
+                    kubectl get services
+                    kubectl get deployments
+                    """
+                }
             }
         }
     }
