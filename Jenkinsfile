@@ -2,28 +2,26 @@ pipeline {
     agent any 
 
     environment {
-        DOCKER_CREDENTIALS_ID = 'roseaw-dockerhub'
-        DOCKER_IMAGE = 'cithit/subletb-lab5'
+        DOCKER_CREDENTIALS_ID = 'roseaw-dockerhub'  
+        DOCKER_IMAGE = 'cithit/subletb'                               //<-----change this to your MiamiID!
         IMAGE_TAG = "build-${BUILD_NUMBER}"
-        GITHUB_URL = 'https://github.com/Subletb/225-lab5-1.git'
+        GITHUB_URL = 'https://github.com/Subletb/225-lab3-3.git' //<-----change this to match this new repository!
+        KUBECONFIG = credentials('subletb-225')                           //<-----change this to match your kubernetes credentials (MiamiID-225)!  1 More change on line 63!
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 cleanWs()
-                checkout([$class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: "${GITHUB_URL}"]]
-                ])
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']],
+                          userRemoteConfigs: [[url: "${GITHUB_URL}"]]])
             }
         }
 
-        stage('Static Code Testing') {
+        stage('Lint HTML') {
             steps {
-                sh 'npm install htmlhint@1.8.0 --save-dev'
-                sh 'npx htmlhint index.html'
+                sh 'npm install htmlhint --save-dev'
+                sh 'npx htmlhint *.html'
             }
         }
 
@@ -45,36 +43,39 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Dev Environment') {
             steps {
-                withCredentials([file(credentialsId: 'subletb-225', variable: 'KUBECONFIG_FILE')]) {
-                    sh """
-                    sed -i 's|image: .*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|' deployment-dev.yaml
-                    kubectl --kubeconfig=$KUBECONFIG_FILE apply -f deployment-dev.yaml
-                    """
+                script {
+                    // This sets up the Kubernetes configuration using the specified KUBECONFIG
+                    def kubeConfig = readFile(KUBECONFIG)
+                    // This updates the deployment-dev.yaml to use the new image tag
+                    sh "sed -i 's|${DOCKER_IMAGE}:latest|${DOCKER_IMAGE}:${IMAGE_TAG}|' deployment-dev.yaml"
+                    sh "kubectl apply -f deployment-dev.yaml"
                 }
             }
         }
-
-        stage('Verify Deployment') {
+        
+        stage('Check Kubernetes Cluster') {
             steps {
-                withCredentials([file(credentialsId: 'subletb-225', variable: 'KUBECONFIG_FILE')]) {
-                    sh """
-                    kubectl --kubeconfig=$KUBECONFIG_FILE get pods
-                    kubectl --kubeconfig=$KUBECONFIG_FILE get services
-                    kubectl --kubeconfig=$KUBECONFIG_FILE get deployments
-                    """
+                script {
+                    sh "kubectl get pods"
+                    sh "kubectl get services"
+                    sh "kubectl get deploy"
                 }
             }
         }
     }
 
     post {
+
         success {
-            slackSend color: "good", message: "SUCCESS: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+            slackSend color: "good", message: "Build Completed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+        }
+        unstable {
+            slackSend color: "warning", message: "Build Completed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
         }
         failure {
-            slackSend color: "danger", message: "FAILED: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+            slackSend color: "danger", message: "Build Completed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
         }
     }
 }
