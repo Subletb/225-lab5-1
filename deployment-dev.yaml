@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: cithit/subletb-lab5:latest
+        image: cithit/subletb:latest
         ports:
         - containerPort: 80
 ---
