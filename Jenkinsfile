@@ -2,11 +2,11 @@ pipeline {
     agent any 
 
     environment {
-        DOCKER_CREDENTIALS_ID = 'roseaw-dockerhub'  
-        DOCKER_IMAGE = 'cithit/subletb'
+        DOCKER_CREDENTIALS_ID = 'roseaw-dockerhub'
+        DOCKER_IMAGE = 'cithit/subletb-lab5'   // ✅ FIXED IMAGE NAME
         IMAGE_TAG = "build-${BUILD_NUMBER}"
         GITHUB_URL = 'https://github.com/Subletb/225-lab5-1.git'
-        KUBECONFIG = credentials('subletb-225')
+        KUBECONFIG = credentials('subletb-225') // Jenkins stored kubeconfig
     }
 
     stages {
@@ -14,14 +14,17 @@ pipeline {
         stage('Checkout') {
             steps {
                 cleanWs()
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: "${GITHUB_URL}"]]])
+                checkout([$class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: "${GITHUB_URL}"]]
+                ])
             }
         }
 
         stage('Static Code Testing') {
             steps {
-                sh 'npm install htmlhint --save-dev'
+                // Use compatible version for Jenkins node
+                sh 'npm install htmlhint@1.8.0 --save-dev'
                 sh 'npx htmlhint index.html'
             }
         }
@@ -47,17 +50,26 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    sh "sed -i 's|image: .*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|' deployment-dev.yaml"
-                    sh "kubectl apply -f deployment-dev.yaml"
+                
+                    writeFile file: 'kubeconfig', text: KUBECONFIG
+
+                    sh """
+                    export KUBECONFIG=\$PWD/kubeconfig
+                    sed -i 's|image: .*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|' deployment-dev.yaml
+                    kubectl apply -f deployment-dev.yaml
+                    """
                 }
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                sh "kubectl get pods"
-                sh "kubectl get services"
-                sh "kubectl get deployments"
+                sh """
+                export KUBECONFIG=\$PWD/kubeconfig
+                kubectl get pods
+                kubectl get services
+                kubectl get deployments
+                """
             }
         }
     }
