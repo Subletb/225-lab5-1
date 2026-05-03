@@ -49,9 +49,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'subletb-225', variable: 'KUBECONFIG_FILE')]) {
                     sh """
-                    export KUBECONFIG=$KUBECONFIG_FILE
                     sed -i 's|image: .*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|' deployment-dev.yaml
-                    kubectl apply -f deployment-dev.yaml
+                    kubectl --kubeconfig=$KUBECONFIG_FILE apply -f deployment-dev.yaml
                     """
                 }
             }
@@ -61,10 +60,9 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'subletb-225', variable: 'KUBECONFIG_FILE')]) {
                     sh """
-                    export KUBECONFIG=$KUBECONFIG_FILE
-                    kubectl get pods
-                    kubectl get services
-                    kubectl get deployments
+                    kubectl --kubeconfig=$KUBECONFIG_FILE get pods
+                    kubectl --kubeconfig=$KUBECONFIG_FILE get services
+                    kubectl --kubeconfig=$KUBECONFIG_FILE get deployments
                     """
                 }
             }
